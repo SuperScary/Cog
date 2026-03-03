@@ -1,0 +1,44 @@
+{
+  "name": "C++",
+  "file_extensions": ["cpp", "hpp", "cxx", "hxx", "cc", "hh"],
+  "rules": [
+    { "scope": "comment.line", "pattern": "//.*$" },
+    { "scope": "comment.block", "begin": "/\\*", "end": "\\*/" },
+
+    { "scope": "string.double", "begin": "\"", "end": "\"" },
+    { "scope": "string.single", "begin": "'", "end": "'" },
+
+    { "scope": "keyword.meta", "pattern": "\\b(alignof|decltype|typeid|sizeof|noexcept|requires|concept)\\b" },
+
+    { "scope": "keyword.control", "pattern": "\\b(if|else|for|while|do|switch|case|default|break|continue|return|goto|try|catch|throw|co_return|co_yield|co_await)\\b" },
+
+    { "scope": "keyword.declaration", "pattern": "\\b(class|struct|union|enum|typename|template|namespace|using|typedef)\\b" },
+
+    { "scope": "keyword.declaration", "pattern": "\\b(auto|decltype\\(auto\\))\\b" },
+
+    { "scope": "storage.modifier", "pattern": "\\b(public|private|protected|friend|virtual|override|final|explicit|inline|static|extern|mutable|constexpr|consteval|constinit|volatile|register|thread_local)\\b" },
+
+    { "scope": "keyword.module", "pattern": "#\\s*(include|define|undef|if|ifdef|ifndef|elif|else|endif|error|pragma|line)\\b" },
+
+    { "scope": "modifier.annotation", "pattern": "#[a-zA-Z_][a-zA-Z0-9_]*" },
+
+    { "scope": "keyword.memory", "pattern": "\\b(new|delete)\\b" },
+
+    { "scope": "keyword.reserved", "pattern": "\\b(nullptr)\\b" },
+
+    { "scope": "variable.language", "pattern": "\\b(this)\\b" },
+
+    { "scope": "constant.language", "pattern": "\\b(true|false|nullptr|NULL)\\b" },
+
+    { "scope": "storage.type", "pattern": "\\b(void|bool|char|wchar_t|char8_t|char16_t|char32_t|short|int|long|float|double|signed|unsigned)\\b" },
+
+    { "scope": "constant.numeric", "pattern": "\\b0[xX][0-9a-fA-F_]+\\b" },
+    { "scope": "constant.numeric", "pattern": "\\b0[bB][01_]+\\b" },
+    {
+      "scope": "constant.numeric",
+      "pattern": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?([uU]?[lL]{0,2}|[fF]|[lL])?\\b"
+    },
+
+    { "scope": "entity.name.type", "pattern": "\\b[A-Z][a-zA-Z0-9_]*\\b" }
+  ]
+}

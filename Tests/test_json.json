@@ -1,0 +1,16 @@
+{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "age": 30,
+    "active": true,
+    "roles": ["admin", "user"],
+    "address": {
+      "street": "123 Main St",
+      "city": "New York",
+      "country": "USA"
+    },
+    "projects": [
+      {"id": 1, "name": "Website Redesign"},
+      {"id": 2, "name": "Mobile App"}
+    ]
+}

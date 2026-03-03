@@ -1,0 +1,25 @@
+{
+  "name": "Cloth",
+  "file_extensions": ["co", "cloth"],
+  "rules": [
+    { "scope": "comment.line", "pattern": "//.*$" },
+    { "scope": "comment.block", "begin": "/\\*", "end": "\\*/" },
+    { "scope": "string.double", "begin": "\"", "end": "\"" },
+    { "scope": "string.single", "begin": "'", "end": "'" },
+    { "scope": "keyword.meta", "pattern": "\\b(ALIGNOF|SIZEOF|OFFSETOF|TYPEOF|COUNTOF)\\b" },
+    { "scope": "keyword.control", "pattern": "\\b(if|else|for|while|do|switch|case|default|break|continue|return|goto|yield)\\b" },
+    { "scope": "keyword.declaration", "pattern": "\\b(func|struct|enum|union|interface|trait|impl|type|class|namespace)\\b" },
+    { "scope": "keyword.declaration", "pattern": "\\b(let|var|const)\\b" },
+    { "scope": "storage.modifier", "pattern": "\\b(public|private|protected|internal|static|extern|inline|volatile|mutable|readonly|abstract|virtual|override|final)\\b" },
+    { "scope": "keyword.module", "pattern": "\\b(module|import|export|using|from|as)\\b" },
+    { "scope": "keyword.memory", "pattern": "\\b(new|delete|ref|deref|move|copy|own|borrow)\\b" },
+    { "scope": "keyword.reserved", "pattern": "\\b(async|await|try|catch|throw|throws|defer|spawn)\\b" },
+    { "scope": "variable.language", "pattern": "\\b(this|super|self|Self)\\b" },
+    { "scope": "constant.language", "pattern": "\\b(true|false|null|nil|none|undefined)\\b" },
+    { "scope": "storage.type", "pattern": "\\b(i8|i16|i32|i64|i128|u8|u16|u32|u64|u128|f32|f64|bool|char|string|void|any|usize|isize)\\b" },
+    { "scope": "constant.numeric", "pattern": "\\b0[xX][0-9a-fA-F_]+\\b" },
+    { "scope": "constant.numeric", "pattern": "\\b0[bB][01_]+\\b" },
+    { "scope": "constant.numeric", "pattern": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?\\b" },
+    { "scope": "entity.name.type", "pattern": "\\b[A-Z][a-zA-Z0-9]*\\b" }
+  ]
+}

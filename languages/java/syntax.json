@@ -1,0 +1,40 @@
+{
+    "name": "Java",
+    "file_extensions": ["java"],
+    "rules": [
+      { "scope": "comment.line", "pattern": "//.*$" },
+      { "scope": "comment.block", "begin": "/\\*", "end": "\\*/" },
+  
+      { "scope": "string.double", "begin": "\"", "end": "\"" },
+      { "scope": "string.single", "begin": "'", "end": "'" },
+  
+      { "scope": "keyword.meta", "pattern": "\\b(instanceof|extends|implements|permits|record|sealed|non-sealed|var)\\b" },
+  
+      { "scope": "keyword.control", "pattern": "\\b(if|else|for|while|do|switch|case|default|break|continue|return|goto|yield|try|catch|finally|throw|assert)\\b" },
+  
+      { "scope": "keyword.declaration", "pattern": "\\b(class|interface|enum|record)\\b" },
+      { "scope": "keyword.declaration", "pattern": "\\b(package|import)\\b" },
+  
+      { "scope": "storage.modifier", "pattern": "\\b(public|private|protected|static|final|abstract|synchronized|native|strictfp|transient|volatile|default)\\b" },
+  
+      { "scope": "keyword.module", "pattern": "\\b(module|open|opens|exports|requires|transitive|to|uses|provides|with)\\b" },
+  
+      { "scope": "keyword.memory", "pattern": "\\b(new)\\b" },
+  
+      { "scope": "keyword.reserved", "pattern": "\\b(this|super)\\b" },
+  
+      { "scope": "variable.language", "pattern": "\\b(this|super)\\b" },
+  
+      { "scope": "constant.language", "pattern": "\\b(true|false|null)\\b" },
+  
+      { "scope": "storage.type", "pattern": "\\b(byte|short|int|long|float|double|boolean|char|void)\\b" },
+  
+      { "scope": "constant.numeric", "pattern": "\\b0[xX][0-9a-fA-F_]+\\b" },
+      { "scope": "constant.numeric", "pattern": "\\b0[bB][01_]+\\b" },
+      { "scope": "constant.numeric", "pattern": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?[fFdD]?\\b" },
+  
+      { "scope": "entity.name.type", "pattern": "\\b[A-Z][a-zA-Z0-9_$]*\\b" },
+
+      { "scope": "modifier.annotation", "pattern": "@[A-Z][a-zA-Z0-9_$]*" }
+    ]
+  }
