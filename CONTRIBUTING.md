@@ -101,7 +101,7 @@ Restart Cog and open a file with one of the extensions you defined. Ensure that 
 ## Getting Started
 
 1.  **Fork the Repository**: Create your own fork of Cog on GitHub.
-2.  **Clone Locally**: `git clone https://github.com/your-username/Cog.git`
+2.  **Clone Locally**: `git clone https://github.com/SuperScary/Cog.git`
 3.  **Create a Branch**: `git checkout -b feature/your-feature-name`
 4.  **Make Changes**: Implement your feature or fix.
 5.  **Run Tests**: `cargo test`
