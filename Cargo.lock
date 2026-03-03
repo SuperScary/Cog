@@ -3,19 +3,6 @@
 version = 4
 
 [[package]]
-name = "Cog"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "chardetng",
- "crossterm",
- "encoding_rs",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +85,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bde03770d3df201d4fb868f2c9c59e66a3e4e2bd06692a0fe701e7103c7e84d4"
 dependencies = [
  "error-code",
+]
+
+[[package]]
+name = "cog"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "chardetng",
+ "crossterm",
+ "encoding_rs",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
