@@ -170,13 +170,12 @@ impl EditHistory {
     pub fn record(&mut self, action: EditAction, merge_with_previous: bool) {
         self.redo_stack.clear();
 
-        if merge_with_previous {
-            if let Some(previous) = self.undo_stack.last() {
-                if let Some(merged) = previous.try_merge_with(&action) {
-                    *self.undo_stack.last_mut().unwrap() = merged;
-                    return;
-                }
-            }
+        if merge_with_previous
+            && let Some(previous) = self.undo_stack.last()
+            && let Some(merged) = previous.try_merge_with(&action)
+        {
+            *self.undo_stack.last_mut().unwrap() = merged;
+            return;
         }
 
         self.undo_stack.push(action);

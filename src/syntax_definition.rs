@@ -54,14 +54,14 @@ impl SyntaxDefinition {
                         regex,
                     });
                 }
-            } else if let (Some(begin), Some(end)) = (&entry.begin, &entry.end) {
-                if let (Ok(begin_regex), Ok(end_regex)) = (Regex::new(begin), Regex::new(end)) {
-                    rules.push(CompiledRule::Span {
-                        scope: entry.scope.clone(),
-                        begin_regex,
-                        end_regex,
-                    });
-                }
+            } else if let (Some(begin), Some(end)) = (&entry.begin, &entry.end)
+                && let (Ok(begin_regex), Ok(end_regex)) = (Regex::new(begin), Regex::new(end))
+            {
+                rules.push(CompiledRule::Span {
+                    scope: entry.scope.clone(),
+                    begin_regex,
+                    end_regex,
+                });
             }
         }
 
@@ -81,16 +81,14 @@ impl SyntaxDefinition {
                 continue;
             }
             let syntax_path = entry.path().join("syntax.json");
-            if syntax_path.exists() {
-                if let Some(definition) = Self::load(&syntax_path) {
-                    if definition
-                        .file_extensions
-                        .iter()
-                        .any(|ext| ext == extension)
-                    {
-                        return Some(definition);
-                    }
-                }
+            if syntax_path.exists()
+                && let Some(definition) = Self::load(&syntax_path)
+                && definition
+                    .file_extensions
+                    .iter()
+                    .any(|ext| ext == extension)
+            {
+                return Some(definition);
             }
         }
 
@@ -99,18 +97,18 @@ impl SyntaxDefinition {
 }
 
 fn find_languages_directory() -> Option<PathBuf> {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_directory) = exe_path.parent() {
-            let candidate = exe_directory.join("languages");
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(exe_directory) = exe_path.parent()
+    {
+        let candidate = exe_directory.join("languages");
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+        // Two levels up handles the cargo target/debug/ layout
+        if let Some(project_root) = exe_directory.parent().and_then(|p| p.parent()) {
+            let candidate = project_root.join("languages");
             if candidate.is_dir() {
                 return Some(candidate);
-            }
-            // Two levels up handles the cargo target/debug/ layout
-            if let Some(project_root) = exe_directory.parent().and_then(|p| p.parent()) {
-                let candidate = project_root.join("languages");
-                if candidate.is_dir() {
-                    return Some(candidate);
-                }
             }
         }
     }

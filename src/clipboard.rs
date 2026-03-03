@@ -27,12 +27,11 @@ impl Clipboard {
     /// Reads from the OS clipboard first (so paste works cross-application),
     /// falling back to the internal history if the OS clipboard is unavailable.
     pub fn latest(&mut self) -> Option<String> {
-        if let Some(os_clipboard) = &mut self.os_clipboard {
-            if let Ok(text) = os_clipboard.get_text() {
-                if !text.is_empty() {
-                    return Some(text);
-                }
-            }
+        if let Some(os_clipboard) = &mut self.os_clipboard
+            && let Ok(text) = os_clipboard.get_text()
+            && !text.is_empty()
+        {
+            return Some(text);
         }
         self.entries.last().cloned()
     }
