@@ -20,6 +20,8 @@ struct RuleEntry {
     begin: Option<String>,
     #[serde(default)]
     end: Option<String>,
+    #[serde(default)]
+    escape: Option<String>,
 }
 
 pub enum CompiledRule {
@@ -31,6 +33,7 @@ pub enum CompiledRule {
         scope: String,
         begin_regex: Regex,
         end_regex: Regex,
+        escape_regex: Option<Regex>,
     },
 }
 
@@ -57,10 +60,15 @@ impl SyntaxDefinition {
             } else if let (Some(begin), Some(end)) = (&entry.begin, &entry.end)
                 && let (Ok(begin_regex), Ok(end_regex)) = (Regex::new(begin), Regex::new(end))
             {
+                let escape_regex = entry
+                    .escape
+                    .as_ref()
+                    .and_then(|e| Regex::new(e).ok());
                 rules.push(CompiledRule::Span {
                     scope: entry.scope.clone(),
                     begin_regex,
                     end_regex,
+                    escape_regex,
                 });
             }
         }

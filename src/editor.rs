@@ -11,6 +11,8 @@ use crate::position::Position;
 use crate::selection::Selection;
 use crate::syntax_definition::SyntaxDefinition;
 use crate::syntax_highlighter::{self, HighlightSpan};
+use crate::tab_handler;
+use crate::status_bar::BottomStatusBar;
 use crossterm::event::KeyEventKind;
 use crossterm::style::{Attribute, Color, SetAttribute, SetForegroundColor};
 use crossterm::{
@@ -21,16 +23,14 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 
-/// A default help message string providing quick shortcuts for user actions.
-///
-/// # Constants:
-/// - **Ctrl+S Save**: Shortcut to save the current progress or work.
-/// - **Ctrl+F Find**: Shortcut to find specific text or elements in the application.
-/// - **Ctrl+Q Quit**: Shortcut to quit or exit the application.
-///
-/// This string is intended to be displayed as a quick reference guide in the user interface
-/// or documentation.
-const DEFAULT_HELP_MESSAGE: &str = "Ctrl+S Save | Ctrl+F Find | Ctrl+Q Quit";
+fn modifier_key_name() -> &'static str {
+    #[cfg(target_os = "macos")]
+    { "Cmd" }
+    #[cfg(target_os = "windows")]
+    { "Ctrl" }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    { "Ctrl" }
+}
 
 /// Represents a text editor structure with various fields to manage its state.
 ///
@@ -54,9 +54,11 @@ pub struct Editor {
     clipboard: Clipboard,
     edit_history: EditHistory,
     syntax_definition: Option<SyntaxDefinition>,
+    tab_size: usize,
     vertical_scroll_offset: usize,
     horizontal_scroll_offset: usize,
     help_message: String,
+    bottom_status_bar: BottomStatusBar,
 }
 
 impl Editor {
@@ -80,9 +82,11 @@ impl Editor {
             clipboard: Clipboard::new(),
             edit_history: EditHistory::new(),
             syntax_definition: None,
+            tab_size: tab_handler::tab_size(),
             vertical_scroll_offset: 0,
             horizontal_scroll_offset: 0,
-            help_message: DEFAULT_HELP_MESSAGE.to_string(),
+            help_message: format!("{}+S Save | {}+F Find | {}+Q Quit", modifier_key_name(), modifier_key_name(), modifier_key_name()),
+            bottom_status_bar: BottomStatusBar::new(1, 0, "")
         }
     }
 
@@ -107,6 +111,7 @@ impl Editor {
     /// - `vertical_scroll_offset`: Defaults to `0` (no vertical scrolling).
     /// - `horizontal_scroll_offset`: Defaults to `0` (no horizontal scrolling).
     /// - `help_message`: Sets to the default help message (`DEFAULT_HELP_MESSAGE.to_string()`).
+    /// - `bottom_status_bar`: A new, empty bottom status bar instance (`BottomStatusBar::new(1, 0, "")`).
     ///
     /// # Errors
     /// This function will return an error as an `io::Error` in case of:
@@ -150,9 +155,11 @@ impl Editor {
             clipboard: Clipboard::new(),
             edit_history: EditHistory::new(),
             syntax_definition,
+            tab_size: tab_handler::tab_size(),
             vertical_scroll_offset: 0,
             horizontal_scroll_offset: 0,
-            help_message: DEFAULT_HELP_MESSAGE.to_string(),
+            help_message: format!("{}+S Save | {}+F Find | {}+Q Quit", modifier_key_name(), modifier_key_name(), modifier_key_name()),
+            bottom_status_bar: BottomStatusBar::new(1, 0, "")
         })
     }
 
@@ -255,28 +262,25 @@ impl Editor {
     ///
     /// # Errors
     /// - Returns an `io::Error` if reading input events or rendering the output fails.
-    fn handle_key_event(
-        &mut self,
-        key_event: KeyEvent,
-        stdout: &mut io::Stdout,
-    ) -> io::Result<bool> {
+    fn handle_key_event(&mut self, key_event: KeyEvent, stdout: &mut io::Stdout, ) -> io::Result<bool> {
         let is_control = key_event.modifiers.contains(KeyModifiers::CONTROL);
         let is_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
+        let (_terminal_width, terminal_height) = terminal::size()?;
+        let page_rows = (terminal_height as usize).saturating_sub(self.status_bar_height() + 2); // Status bar and prompt bar
+        let max_row = self.document.number_of_lines().saturating_sub(1);
 
         if is_control && key_event.code == KeyCode::Char('q') {
             if !self.document.is_modified() {
                 return Ok(true);
             }
 
-            self.help_message =
-                "Unsaved changes! Save before quitting? (y/n, Esc to cancel)".to_string();
+            self.help_message = "Unsaved changes! Save before quitting? (y/n, Esc to cancel)".to_string();
             self.render(stdout)?;
 
             loop {
                 if let Event::Key(confirm_event) = event::read()? {
-                    if confirm_event.kind != KeyEventKind::Press {
-                        continue;
-                    }
+                    if confirm_event.kind != KeyEventKind::Press { continue; }
+
                     match confirm_event.code {
                         KeyCode::Char('y') => match self.document.save_to_file(None::<&str>) {
                             Ok(()) => return Ok(true),
@@ -287,13 +291,33 @@ impl Editor {
                         },
                         KeyCode::Char('n') => return Ok(true),
                         KeyCode::Esc => {
-                            self.help_message = DEFAULT_HELP_MESSAGE.to_string();
+                            self.help_message = format!("{}+S Save | {}+F Find | {}+Q Quit", modifier_key_name(), modifier_key_name(), modifier_key_name());
                             break;
                         }
                         _ => {}
                     }
                 }
             }
+        } else if is_control && key_event.code == KeyCode::PageUp {
+            self.caret_position.row_index = 0;
+            self.caret_position.column_index = 0;
+            self.ensure_caret_is_visible()?;
+            return Ok(false);
+        } else if is_control && key_event.code == KeyCode::PageDown {
+            self.caret_position.row_index = self.document.number_of_lines() - 1;
+            self.caret_position.column_index = self.document.line(self.caret_position.row_index).len();
+            self.ensure_caret_is_visible()?;
+            return Ok(false);
+        } else if !is_control && key_event.code == KeyCode::PageUp {
+            self.caret_position.row_index = self.caret_position.row_index.saturating_sub(page_rows).min(max_row);
+            self.caret_position.column_index = self.caret_position.column_index.min(self.document.line(self.caret_position.row_index).len());
+            self.ensure_caret_is_visible()?;
+            return Ok(false);
+        } else if !is_control && key_event.code == KeyCode::PageDown {
+            self.caret_position.row_index = self.caret_position.row_index.saturating_add(page_rows).min(max_row);
+            self.caret_position.column_index = self.caret_position.column_index.min(self.document.line(self.caret_position.row_index).len());
+            self.ensure_caret_is_visible()?;
+            return Ok(false);
         }
 
         match key_event.code {
@@ -1077,15 +1101,30 @@ impl Editor {
                 .saturating_sub(visible_text_area_height - 1);
         }
 
-        if self.caret_position.column_index < self.horizontal_scroll_offset {
+        let line = self.document.line(self.caret_position.row_index);
+        let caret_display_column =
+            tab_handler::display_column(line, self.caret_position.column_index, self.tab_size);
+        let scroll_display_column =
+            tab_handler::display_column(line, self.horizontal_scroll_offset, self.tab_size);
+
+        if caret_display_column < scroll_display_column {
             self.horizontal_scroll_offset = self.caret_position.column_index;
-        } else if self.caret_position.column_index
-            >= self.horizontal_scroll_offset + visible_text_area_width
-        {
-            self.horizontal_scroll_offset = self
-                .caret_position
-                .column_index
-                .saturating_sub(visible_text_area_width - 1);
+        } else if caret_display_column >= scroll_display_column + visible_text_area_width {
+            let target_display = caret_display_column.saturating_sub(visible_text_area_width - 1);
+            let mut byte_offset = 0;
+            let mut col = 0;
+            for ch in line.chars() {
+                if col >= target_display {
+                    break;
+                }
+                if ch == '\t' {
+                    col = col + self.tab_size - (col % self.tab_size);
+                } else {
+                    col += 1;
+                }
+                byte_offset += ch.len_utf8();
+            }
+            self.horizontal_scroll_offset = byte_offset;
         }
 
         Ok(())
@@ -1191,12 +1230,7 @@ impl Editor {
                 Vec::new()
             };
 
-            self.render_text_line(
-                stdout,
-                document_row_index,
-                text_area_width,
-                &highlight_spans,
-            )?;
+            self.render_text_line(stdout, document_row_index, text_area_width, &highlight_spans)?;
 
             queue!(
                 stdout,
@@ -1273,27 +1307,62 @@ impl Editor {
     /// Ensure that `stdout` is flushed after this method, if necessary, to display the queued
     /// output on the terminal.
 
-    fn render_text_line(
-        &self,
-        stdout: &mut io::Stdout,
-        document_row_index: usize,
-        text_area_width: usize,
-        highlight_spans: &[HighlightSpan],
-    ) -> io::Result<()> {
+    fn render_text_line(&self, stdout: &mut io::Stdout, document_row_index: usize, text_area_width: usize, highlight_spans: &[HighlightSpan], ) -> io::Result<()> {
         let line_text = self.document.line(document_row_index);
-        let line_length = line_text.len();
+        if line_text.is_empty() {
+            return Ok(());
+        }
 
-        let visible_start = self.horizontal_scroll_offset.min(line_length);
-        let visible_end = (self.horizontal_scroll_offset + text_area_width).min(line_length);
+        let (expanded, byte_to_display) =
+            tab_handler::expand_tabs(line_text, self.tab_size);
+        let expanded_len = expanded.len();
+
+        let mapped_spans: Vec<HighlightSpan> = highlight_spans
+            .iter()
+            .map(|span| HighlightSpan {
+                byte_start: tab_handler::original_byte_to_expanded_byte(
+                    &byte_to_display,
+                    span.byte_start,
+                    expanded_len,
+                ),
+                byte_end: tab_handler::original_byte_to_expanded_byte(
+                    &byte_to_display,
+                    span.byte_end,
+                    expanded_len,
+                ),
+                color: span.color,
+            })
+            .collect();
+
+        let scroll_column =
+            tab_handler::display_column(line_text, self.horizontal_scroll_offset, self.tab_size);
+        let visible_start = scroll_column.min(expanded_len);
+        let visible_end = (scroll_column + text_area_width).min(expanded_len);
 
         if visible_start >= visible_end {
             return Ok(());
         }
 
-        let visible_text = &line_text[visible_start..visible_end];
+        let visible_text = &expanded[visible_start..visible_end];
+        let original_line_length = line_text.len();
 
-        let selection_range = self.selection_columns_for_line(document_row_index, line_length);
-        if highlight_spans.is_empty() && selection_range.is_none() {
+        let selection_range =
+            self.selection_columns_for_line(document_row_index, original_line_length);
+        let mapped_selection = selection_range.map(|(s, e)| {
+            let es = tab_handler::original_byte_to_expanded_byte(
+                &byte_to_display,
+                s,
+                expanded_len,
+            );
+            let ee = tab_handler::original_byte_to_expanded_byte(
+                &byte_to_display,
+                e,
+                expanded_len,
+            );
+            (es, ee)
+        });
+
+        if mapped_spans.is_empty() && mapped_selection.is_none() {
             queue!(stdout, Print(visible_text))?;
             return Ok(());
         }
@@ -1301,7 +1370,7 @@ impl Editor {
         let visible_len = visible_end - visible_start;
         let mut colors: Vec<Color> = vec![Color::Reset; visible_len];
 
-        for span in highlight_spans {
+        for span in &mapped_spans {
             if span.byte_end <= visible_start || span.byte_start >= visible_end {
                 continue;
             }
@@ -1312,7 +1381,7 @@ impl Editor {
             }
         }
 
-        let (selection_vis_start, selection_vis_end) = match selection_range {
+        let (selection_vis_start, selection_vis_end) = match mapped_selection {
             Some((s, e)) => {
                 let vs = s.max(visible_start).min(visible_end) - visible_start;
                 let ve = e.max(visible_start).min(visible_end) - visible_start;
@@ -1401,11 +1470,7 @@ impl Editor {
     ///     println!("Row {} is not in the selection range.", row_index);
     /// }
     /// ```
-    fn selection_columns_for_line(
-        &self,
-        row_index: usize,
-        line_length: usize,
-    ) -> Option<(usize, usize)> {
+    fn selection_columns_for_line(&self, row_index: usize, line_length: usize, ) -> Option<(usize, usize)> {
         let selection = self.selection.as_ref()?;
         let (start, end) = selection.ordered_range();
 
@@ -1466,15 +1531,10 @@ impl Editor {
     /// let terminal_width = 80;
     /// let terminal_height = 24;
     ///
-    /// // Assuming `self` implements this function in a struct with the required fields.
+    /// // Assuming `self` is a mutable reference to an instance of `Editor`
     /// self.render_status_bar(&mut stdout, terminal_width, terminal_height)?;
     /// ```
-    fn render_status_bar(
-        &self,
-        stdout: &mut io::Stdout,
-        terminal_width: usize,
-        terminal_height: usize,
-    ) -> io::Result<()> {
+    fn render_status_bar(&mut self, stdout: &mut io::Stdout, terminal_width: usize, terminal_height: usize, ) -> io::Result<()> {
         let status_bar_row = (terminal_height - 2) as u16;
 
         let file_name = self.document.file_name_display();
@@ -1506,11 +1566,13 @@ impl Editor {
             status_text.truncate(terminal_width);
         }
 
+        self.bottom_status_bar.set_text(&status_text);
+
         queue!(
             stdout,
             cursor::MoveTo(0, status_bar_row),
             SetAttribute(Attribute::Reverse),
-            Print(status_text),
+            Print(self.bottom_status_bar.get_text()),
             SetAttribute(Attribute::Reset),
         )?;
 
@@ -1531,11 +1593,14 @@ impl Editor {
     }
 
     fn render_caret(&self, stdout: &mut io::Stdout, gutter_width: usize) -> io::Result<()> {
-        let caret_screen_column = (self
-            .caret_position
-            .column_index
-            .saturating_sub(self.horizontal_scroll_offset)
-            + gutter_width) as u16;
+        let line = self.document.line(self.caret_position.row_index);
+        let caret_display_column =
+            tab_handler::display_column(line, self.caret_position.column_index, self.tab_size);
+        let scroll_display_column =
+            tab_handler::display_column(line, self.horizontal_scroll_offset, self.tab_size);
+
+        let caret_screen_column =
+            (caret_display_column.saturating_sub(scroll_display_column) + gutter_width) as u16;
 
         let caret_screen_row = self
             .caret_position
@@ -1548,5 +1613,13 @@ impl Editor {
             cursor::Show
         )?;
         Ok(())
+    }
+
+    pub fn status_bar_height(&self) -> usize {
+        self.bottom_status_bar.get_height()
+    }
+
+    pub fn set_status_bar_text(&mut self, text: &str) {
+        self.bottom_status_bar.set_text(text);
     }
 }

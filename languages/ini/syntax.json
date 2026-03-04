@@ -1,0 +1,20 @@
+{
+  "name": "INI",
+  "file_extensions": ["ini", "cfg", "conf"],
+  "rules": [
+    { "scope": "comment.line", "pattern": "[;#].*$" },
+
+    { "scope": "entity.name.type", "pattern": "^\\s*\\[[^\\]]+\\]" },
+
+    { "scope": "keyword.declaration", "pattern": "^\\s*[a-zA-Z0-9_.-]+(?=\\s*=)" },
+
+    { "scope": "keyword.control", "pattern": "=" },
+
+    { "scope": "string.double", "begin": "\"", "end": "\"" },
+    { "scope": "string.single", "begin": "'", "end": "'" },
+
+    { "scope": "constant.language", "pattern": "\\b(true|false|yes|no|on|off|null)\\b" },
+
+    { "scope": "constant.numeric", "pattern": "\\b[0-9]+\\b" }
+  ]
+}

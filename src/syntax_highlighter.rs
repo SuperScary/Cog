@@ -16,47 +16,54 @@ pub struct HighlightSpan {
 /// (e.g. a block comment or string that started on a previous line).
 /// Returns the highlight spans for this line and the span state to carry
 /// into the next line.
-pub fn highlight_line(
-    definition: &SyntaxDefinition,
-    text: &str,
-    active_span_rule_index: Option<usize>,
-) -> (Vec<HighlightSpan>, Option<usize>) {
+pub fn highlight_line(definition: &SyntaxDefinition, text: &str, active_span_rule_index: Option<usize>, ) -> (Vec<HighlightSpan>, Option<usize>) {
     let mut spans = Vec::new();
     let mut current_state = active_span_rule_index;
 
     if let Some(rule_index) = current_state {
         if let Some(CompiledRule::Span {
-            scope, end_regex, ..
+            scope,
+            end_regex,
+            escape_regex,
+            ..
         }) = definition.rules.get(rule_index)
         {
-            if let Some(end_match) = end_regex.find(text) {
-                spans.push(HighlightSpan {
-                    byte_start: 0,
-                    byte_end: end_match.end(),
-                    color: scope_to_color(scope),
-                });
+            if let Some(end_pos) = scan_span_end(text, 0, end_regex, escape_regex.as_ref()) {
+                spans.push(HighlightSpan { byte_start: 0, byte_end: end_pos, color: scope_to_color(scope) });
                 current_state = None;
-                find_highlights(
-                    definition,
-                    text,
-                    end_match.end(),
-                    &mut spans,
-                    &mut current_state,
-                );
+                find_highlights(definition, text, end_pos, &mut spans, &mut current_state);
             } else {
-                spans.push(HighlightSpan {
-                    byte_start: 0,
-                    byte_end: text.len(),
-                    color: scope_to_color(scope),
-                });
-                return (spans, current_state);
+                spans.push(HighlightSpan { byte_start: 0, byte_end: text.len(), color: scope_to_color(scope) });
+                // still inside span for next line
             }
+            return (spans, current_state);
         }
     } else {
         find_highlights(definition, text, 0, &mut spans, &mut current_state);
     }
 
     (spans, current_state)
+}
+
+// Helper: scan to the end of a span, honoring escapes
+fn scan_span_end(text: &str, mut pos: usize, end_regex: &regex::Regex, escape_regex: Option<&regex::Regex>) -> Option<usize> {
+    while pos < text.len() {
+        if let Some(esc) = escape_regex {
+            if let Some(m) = esc.find(&text[pos..]) {
+                if m.start() == 0 {
+                    pos += m.end();
+                    continue;
+                }
+            }
+        }
+        if let Some(m) = end_regex.find(&text[pos..]) {
+            if m.start() == 0 {
+                return Some(pos + m.end());
+            }
+        }
+        pos += 1;
+    }
+    None
 }
 
 fn find_highlights(
@@ -85,22 +92,17 @@ fn find_highlights(
                 position = match_end;
             }
             CompiledRule::Span {
-                scope, end_regex, ..
+                scope,
+                end_regex,
+                escape_regex,
+                ..
             } => {
-                if let Some(end_match) = end_regex.find(&text[match_end..]) {
-                    let span_end = match_end + end_match.end();
-                    spans.push(HighlightSpan {
-                        byte_start: match_start,
-                        byte_end: span_end,
-                        color: scope_to_color(scope),
-                    });
-                    position = span_end;
+                let start_pos = match_end;
+                if let Some(end_pos) = scan_span_end(text, start_pos, end_regex, escape_regex.as_ref()) {
+                    spans.push(HighlightSpan { byte_start: match_start, byte_end: end_pos, color: scope_to_color(scope) });
+                    position = end_pos;
                 } else {
-                    spans.push(HighlightSpan {
-                        byte_start: match_start,
-                        byte_end: text.len(),
-                        color: scope_to_color(scope),
-                    });
+                    spans.push(HighlightSpan { byte_start: match_start, byte_end: text.len(), color: scope_to_color(scope) });
                     *active_span = Some(rule_index);
                     return;
                 }

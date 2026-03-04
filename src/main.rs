@@ -14,8 +14,12 @@ mod position;
 mod selection;
 mod syntax_definition;
 mod syntax_highlighter;
+mod tab_handler;
 mod terminal_session;
 pub mod config;
+mod status_bar;
+#[cfg(test)]
+mod syntax_tests;
 
 fn ensure_configs_exist() {
     config::configs::load_user_settings();

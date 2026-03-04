@@ -1,0 +1,18 @@
+{
+  "name": "JSON",
+  "file_extensions": ["json"],
+  "rules": [
+    { "scope": "comment.line", "pattern": "//.*$" },
+    { "scope": "comment.block", "begin": "/\\*", "end": "\\*/" },
+
+    { "scope": "string.double", "begin": "\"", "end": "\"", "escape": "\\\\." },
+
+    { "scope": "keyword.declaration", "pattern": "\"[^\"]+\"(?=\\s*:)" },
+
+    { "scope": "keyword.control", "pattern": ":" },
+
+    { "scope": "constant.language", "pattern": "\\b(true|false|null)\\b" },
+
+    { "scope": "constant.numeric", "pattern": "\\b-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b" }
+  ]
+}

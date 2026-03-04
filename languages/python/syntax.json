@@ -1,0 +1,39 @@
+{
+  "name": "Python",
+  "file_extensions": ["py", "pyi"],
+  "rules": [
+    { "scope": "comment.line", "pattern": "#.*$" },
+
+    { "scope": "string.double", "begin": "\"", "end": "\"", "escape": "\\\\." },
+    { "scope": "string.single", "begin": "'", "end": "'", "escape": "\\\\." },
+
+    { "scope": "keyword.meta", "pattern": "\\b(as|from|import|pass|del|global|nonlocal|with|lambda|yield|await|async)\\b" },
+
+    { "scope": "keyword.control", "pattern": "\\b(if|elif|else|for|while|try|except|finally|raise|break|continue|return|match|case|assert)\\b" },
+
+    { "scope": "keyword.declaration", "pattern": "\\b(def|class)\\b" },
+
+    { "scope": "storage.modifier", "pattern": "\\b(None|True|False)\\b" },
+
+    { "scope": "keyword.module", "pattern": "\\b(import|from|as)\\b" },
+
+    { "scope": "keyword.memory", "pattern": "\\b(del)\\b" },
+
+    { "scope": "variable.language", "pattern": "\\b(self|cls)\\b" },
+
+    { "scope": "constant.language", "pattern": "\\b(None|True|False)\\b" },
+
+    { "scope": "storage.type", "pattern": "\\b(int|float|bool|str|bytes|bytearray|list|tuple|dict|set|frozenset|object|type|None)\\b" },
+
+    { "scope": "constant.numeric", "pattern": "\\b0[xX][0-9a-fA-F_]+\\b" },
+    { "scope": "constant.numeric", "pattern": "\\b0[bB][01_]+\\b" },
+    {
+      "scope": "constant.numeric",
+      "pattern": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?j?\\b"
+    },
+
+    { "scope": "modifier.annotation", "pattern": "@[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*" },
+
+    { "scope": "entity.name.type", "pattern": "\\b[A-Z][a-zA-Z0-9_]*\\b" }
+  ]
+}
