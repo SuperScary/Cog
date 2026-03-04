@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::sync::LazyLock;
 use crossterm::style::Color;
 
 use crate::syntax_definition::{CompiledRule, SyntaxDefinition};
@@ -142,42 +144,113 @@ fn find_earliest_match(
     best
 }
 
-pub fn scope_to_color(scope: &str) -> Color {
-    if scope.eq("comment.documentation") {
-        Color::Green
-    } else if scope.starts_with("comment") {
-        Color::DarkGrey
-    } else if scope.starts_with("string") {
-        Color::Green
-    } else if scope.starts_with("keyword.control") {
-        Color::Magenta
-    } else if scope.starts_with("keyword.declaration") {
-        Color::Blue
-    } else if scope.starts_with("keyword") {
-        Color::Magenta
-    } else if scope.starts_with("storage.modifier") {
-        Color::Cyan
-    } else if scope.starts_with("storage.type") {
-        Color::Cyan
-    } else if scope.starts_with("storage") {
-        Color::Cyan
-    } else if scope.starts_with("constant.numeric") {
-        Color::Yellow
-    } else if scope.starts_with("constant.language") {
-        Color::DarkYellow
-    } else if scope.starts_with("constant") {
-        Color::Yellow
-    } else if scope.starts_with("entity.name.function") {
-        Color::Yellow
-    } else if scope.starts_with("entity.name.type") {
-        Color::DarkCyan
-    } else if scope.starts_with("entity") {
-        Color::Cyan
-    } else if scope.starts_with("variable.language") {
-        Color::Red
-    } else if scope.starts_with("modifier.annotation") {
-        Color::Yellow
-    } else {
-        Color::Reset
+fn hex_to_rgb(hex: &str) -> Option<(u8, u8, u8)> {
+    let hex = hex.trim_start_matches('#');
+
+    match hex.len() {
+        6 => {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            Some((r, g, b))
+        }
+        8 => { // RRGGBBAA -> ignore AA
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            Some((r, g, b))
+        }
+        3 => {
+            let r = u8::from_str_radix(&hex[0..1], 16).ok()?;
+            let g = u8::from_str_radix(&hex[1..2], 16).ok()?;
+            let b = u8::from_str_radix(&hex[2..3], 16).ok()?;
+            Some((r * 16 + r, g * 16 + g, b * 16 + b))
+        }
+        4 => { // RGBA -> ignore A
+            let r = u8::from_str_radix(&hex[0..1], 16).ok()?;
+            let g = u8::from_str_radix(&hex[1..2], 16).ok()?;
+            let b = u8::from_str_radix(&hex[2..3], 16).ok()?;
+            Some((r * 16 + r, g * 16 + g, b * 16 + b))
+        }
+        _ => None,
     }
+}
+
+fn parse_named_color(name: &str) -> Option<Color> {
+    let n = name
+        .trim()
+        .to_ascii_lowercase()
+        .replace([' ', '-', '.'], "_");
+
+    Some(match n.as_str() {
+        "reset" | "default" | "none" => Color::Reset,
+
+        // standard 16 colors (crossterm)
+        "black" => Color::Black,
+        "dark_grey" | "dark_gray" => Color::DarkGrey,
+        "grey" | "gray" => Color::Grey,
+        "white" => Color::White,
+
+        "red" => Color::Red,
+        "dark_red" => Color::DarkRed,
+        "green" => Color::Green,
+        "dark_green" => Color::DarkGreen,
+        "yellow" => Color::Yellow,
+        "dark_yellow" => Color::DarkYellow,
+        "blue" => Color::Blue,
+        "dark_blue" => Color::DarkBlue,
+        "magenta" => Color::Magenta,
+        "dark_magenta" => Color::DarkMagenta,
+        "cyan" => Color::Cyan,
+        "dark_cyan" => Color::DarkCyan,
+
+        "orange" => Color::DarkYellow,
+        "purple" => Color::Magenta,
+        "pink" => Color::Magenta,
+
+        _ => return None,
+    })
+}
+
+fn parse_color(color_spec: &str) -> Color {
+    let s = color_spec.trim();
+
+    // named console colors first
+    if let Some(c) = parse_named_color(s) {
+        return c;
+    }
+
+    // truecolor
+    if let Some((r, g, b)) = hex_to_rgb(s) {
+        return Color::Rgb { r, g, b };
+    }
+
+    Color::Reset
+}
+
+static COLOR_MAP: LazyLock<HashMap<String, Color>> = LazyLock::new(|| {
+    let config = crate::config::configs::load_color_scheme();
+    let mut map = HashMap::new();
+
+    if let Some(section) = config.section(Some("Highlighting")) {
+        for (key, value) in section.iter() {
+            map.insert(key.to_string(), parse_color(value));
+        }
+    }
+    map
+});
+
+pub fn scope_to_color(scope: &str) -> Color {
+    let mut current_scope = scope;
+    loop {
+        if let Some(color) = COLOR_MAP.get(current_scope) {
+            return *color;
+        }
+        if let Some(dot_index) = current_scope.rfind('.') {
+            current_scope = &current_scope[..dot_index];
+        } else {
+            break;
+        }
+    }
+    Color::Reset
 }

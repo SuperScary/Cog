@@ -15,9 +15,17 @@ mod selection;
 mod syntax_definition;
 mod syntax_highlighter;
 mod terminal_session;
+pub mod config;
+
+fn ensure_configs_exist() {
+    config::configs::load_user_settings();
+    config::configs::load_editor_settings();
+    config::configs::load_color_scheme();
+}
 
 fn main() -> std::io::Result<()> {
     let mut terminal_session = TerminalSession::start()?;
+    ensure_configs_exist();
 
     let file_path = env::args().nth(1);
 
