@@ -1,3 +1,6 @@
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
+
 const DEFAULT_TAB_SIZE: usize = 4;
 
 /// Returns the configured tab size, or the default (4) if the config is unavailable.
@@ -10,17 +13,17 @@ pub fn tab_size() -> usize {
 }
 
 /// Computes the display column for a given byte offset in a line, accounting
-/// for tab characters that expand to the next tab stop.
+/// for tab characters that expand to the next tab stop and multi-column characters.
 pub fn display_column(line: &str, byte_offset: usize, tab_size: usize) -> usize {
     let mut column = 0;
-    for (index, character) in line.char_indices() {
+    for (index, grapheme) in line.grapheme_indices(true) {
         if index >= byte_offset {
             break;
         }
-        if character == '\t' {
+        if grapheme == "\t" {
             column = column + tab_size - (column % tab_size);
         } else {
-            column += 1;
+            column += grapheme.width();
         }
     }
     column
@@ -34,22 +37,22 @@ pub fn expand_tabs(line: &str, tab_size: usize) -> (String, Vec<usize>) {
     let mut byte_to_display = Vec::with_capacity(line.len());
     let mut column = 0;
 
-    for character in line.chars() {
-        let char_byte_len = character.len_utf8();
+    for grapheme in line.graphemes(true) {
+        let grapheme_byte_len = grapheme.len();
         let start_column = column;
 
-        if character == '\t' {
+        if grapheme == "\t" {
             let spaces = tab_size - (column % tab_size);
             for _ in 0..spaces {
                 expanded.push(' ');
             }
             column += spaces;
         } else {
-            expanded.push(character);
-            column += 1;
+            expanded.push_str(grapheme);
+            column += grapheme.width();
         }
 
-        for _ in 0..char_byte_len {
+        for _ in 0..grapheme_byte_len {
             byte_to_display.push(start_column);
         }
     }

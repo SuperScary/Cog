@@ -127,6 +127,26 @@ impl Document {
         let start_byte = start.column_index.min(self.line(start.row_index).len());
         let end_byte = end.column_index.min(self.line(end_row).len());
 
+        let start_byte = if !self.lines[start.row_index].is_char_boundary(start_byte) {
+            let mut adj = start_byte;
+            while adj > 0 && !self.lines[start.row_index].is_char_boundary(adj) {
+                adj -= 1;
+            }
+            adj
+        } else {
+            start_byte
+        };
+
+        let end_byte = if !self.lines[end_row].is_char_boundary(end_byte) {
+            let mut adj = end_byte;
+            while adj > 0 && !self.lines[end_row].is_char_boundary(adj) {
+                adj -= 1;
+            }
+            adj
+        } else {
+            end_byte
+        };
+
         if start.row_index == end_row {
             return self.lines[start.row_index][start_byte..end_byte].to_string();
         }
@@ -159,9 +179,22 @@ impl Document {
         let insert_byte = position
             .column_index
             .min(self.lines[position.row_index].len());
+
+        // Ensure we split at a valid character boundary
+        let insert_byte = if !self.lines[position.row_index].is_char_boundary(insert_byte) {
+            let mut adj = insert_byte;
+            while adj > 0 && !self.lines[position.row_index].is_char_boundary(adj) {
+                adj -= 1;
+            }
+            adj
+        } else {
+            insert_byte
+        };
+
         let after_cursor = self.lines[position.row_index].split_off(insert_byte);
 
-        let segments: Vec<&str> = text.split('\n').collect();
+        let normalized_text = text.replace("\r\n", "\n").replace('\r', "\n");
+        let segments: Vec<&str> = normalized_text.split('\n').collect();
 
         self.lines[position.row_index].push_str(segments[0]);
 
@@ -193,6 +226,26 @@ impl Document {
         let end_row = end.row_index.min(self.lines.len() - 1);
         let start_byte = start.column_index.min(self.lines[start.row_index].len());
         let end_byte = end.column_index.min(self.lines[end_row].len());
+
+        let start_byte = if !self.lines[start.row_index].is_char_boundary(start_byte) {
+            let mut adj = start_byte;
+            while adj > 0 && !self.lines[start.row_index].is_char_boundary(adj) {
+                adj -= 1;
+            }
+            adj
+        } else {
+            start_byte
+        };
+
+        let end_byte = if !self.lines[end_row].is_char_boundary(end_byte) {
+            let mut adj = end_byte;
+            while adj > 0 && !self.lines[end_row].is_char_boundary(adj) {
+                adj -= 1;
+            }
+            adj
+        } else {
+            end_byte
+        };
 
         if start.row_index == end_row {
             let deleted: String = self.lines[start.row_index]

@@ -3,6 +3,7 @@ use std::io;
 use crossterm::{
     cursor, execute,
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{EnableBracketedPaste, DisableBracketedPaste},
 };
 
 pub struct TerminalSession {
@@ -14,7 +15,7 @@ impl TerminalSession {
         terminal::enable_raw_mode()?;
 
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+        execute!(stdout, EnterAlternateScreen, cursor::Hide, EnableBracketedPaste)?;
 
         Ok(Self { stdout })
     }
@@ -26,7 +27,7 @@ impl TerminalSession {
 
 impl Drop for TerminalSession {
     fn drop(&mut self) {
-        let _ = execute!(self.stdout, cursor::Show, LeaveAlternateScreen);
+        let _ = execute!(self.stdout, cursor::Show, LeaveAlternateScreen, DisableBracketedPaste);
         let _ = terminal::disable_raw_mode();
     }
 }

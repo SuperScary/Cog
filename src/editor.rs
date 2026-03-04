@@ -12,6 +12,8 @@ use crate::selection::Selection;
 use crate::syntax_definition::SyntaxDefinition;
 use crate::syntax_highlighter::{self, HighlightSpan};
 use crate::tab_handler;
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 use crate::status_bar::BottomStatusBar;
 use crossterm::event::KeyEventKind;
 use crossterm::style::{Attribute, Color, SetAttribute, SetForegroundColor};
@@ -206,12 +208,17 @@ impl Editor {
 
                 match event::read()? {
                     Event::Key(key_event) => {
-                        if key_event.kind == KeyEventKind::Press {
+                        // Some terminals might send Release or Repeat events
+                        if key_event.kind == KeyEventKind::Press || key_event.kind == KeyEventKind::Repeat {
                             let should_quit = self.handle_key_event(key_event, stdout)?;
                             if should_quit {
                                 break;
                             }
                         }
+                    }
+                    Event::Paste(text) => {
+                        self.perform_insert(&text, false);
+                        self.help_message = format!("Terminal Paste: {} graphemes", text.graphemes(true).count());
                     }
                     Event::Resize(_, _) => {
                         self.ensure_caret_is_visible()?;
@@ -502,7 +509,13 @@ impl Editor {
     /// ```
     fn move_caret_left(&mut self) {
         if self.caret_position.column_index > 0 {
-            self.caret_position.column_index -= 1;
+            let line = self.document.line(self.caret_position.row_index);
+            let prev_grapheme_start = line[..self.caret_position.column_index]
+                .grapheme_indices(true)
+                .last()
+                .map(|(idx, _)| idx)
+                .unwrap_or(0);
+            self.caret_position.column_index = prev_grapheme_start;
             return;
         }
 
@@ -538,10 +551,16 @@ impl Editor {
     /// - `self.document.line(row_index)`: Returns the content of the line at a given row index.
     /// - `self.document.number_of_lines()`: Returns the total number of lines in the document.
     fn move_caret_right(&mut self) {
-        let current_line_length = self.document.line(self.caret_position.row_index).len();
+        let line = self.document.line(self.caret_position.row_index);
+        let current_line_length = line.len();
 
         if self.caret_position.column_index < current_line_length {
-            self.caret_position.column_index += 1;
+            let next_grapheme_end = line[self.caret_position.column_index..]
+                .grapheme_indices(true)
+                .nth(1)
+                .map(|(idx, _)| self.caret_position.column_index + idx)
+                .unwrap_or(current_line_length);
+            self.caret_position.column_index = next_grapheme_end;
             return;
         }
 
@@ -715,10 +734,13 @@ impl Editor {
         }
 
         let delete_start = if self.caret_position.column_index > 0 {
-            Position::new(
-                self.caret_position.row_index,
-                self.caret_position.column_index - 1,
-            )
+            let line = self.document.line(self.caret_position.row_index);
+            let prev_grapheme_start = line[..self.caret_position.column_index]
+                .grapheme_indices(true)
+                .last()
+                .map(|(idx, _)| idx)
+                .unwrap_or(0);
+            Position::new(self.caret_position.row_index, prev_grapheme_start)
         } else if self.caret_position.row_index > 0 {
             let previous_row = self.caret_position.row_index - 1;
             Position::new(previous_row, self.document.line(previous_row).len())
@@ -784,13 +806,16 @@ impl Editor {
             return;
         }
 
-        let line_length = self.document.line(self.caret_position.row_index).len();
+        let line = self.document.line(self.caret_position.row_index);
+        let line_length = line.len();
 
         let delete_end = if self.caret_position.column_index < line_length {
-            Position::new(
-                self.caret_position.row_index,
-                self.caret_position.column_index + 1,
-            )
+            let next_grapheme_end = line[self.caret_position.column_index..]
+                .grapheme_indices(true)
+                .nth(1)
+                .map(|(idx, _)| self.caret_position.column_index + idx)
+                .unwrap_or(line_length);
+            Position::new(self.caret_position.row_index, next_grapheme_end)
         } else if self.caret_position.row_index + 1 < self.document.number_of_lines() {
             Position::new(self.caret_position.row_index + 1, 0)
         } else {
@@ -970,6 +995,7 @@ impl Editor {
     fn perform_paste(&mut self) {
         if let Some(text) = self.clipboard.latest() {
             self.perform_insert(&text, false);
+            self.help_message = format!("Pasted from clipboard: {} graphemes", text.graphemes(true).count());
         }
     }
 
@@ -1113,16 +1139,16 @@ impl Editor {
             let target_display = caret_display_column.saturating_sub(visible_text_area_width - 1);
             let mut byte_offset = 0;
             let mut col = 0;
-            for ch in line.chars() {
+            for (idx, grapheme) in line.grapheme_indices(true) {
                 if col >= target_display {
                     break;
                 }
-                if ch == '\t' {
+                if grapheme == "\t" {
                     col = col + self.tab_size - (col % self.tab_size);
                 } else {
-                    col += 1;
+                    col += grapheme.width();
                 }
-                byte_offset += ch.len_utf8();
+                byte_offset = idx + grapheme.len();
             }
             self.horizontal_scroll_offset = byte_offset;
         }
@@ -1391,21 +1417,27 @@ impl Editor {
         };
 
         let mut position = 0;
-        while position < visible_len {
+        let graphemes: Vec<&str> = visible_text.graphemes(true).collect();
+        let num_graphemes = graphemes.len();
+        
+        let mut segment_byte_start = 0;
+        while position < num_graphemes {
             let current_color = colors[position];
             let current_selected = position >= selection_vis_start && position < selection_vis_end;
 
             let mut segment_end = position + 1;
-            while segment_end < visible_len {
+            let mut segment_byte_end = segment_byte_start + graphemes[position].len();
+            while segment_end < num_graphemes {
                 let next_selected =
                     segment_end >= selection_vis_start && segment_end < selection_vis_end;
                 if colors[segment_end] != current_color || next_selected != current_selected {
                     break;
                 }
+                segment_byte_end += graphemes[segment_end].len();
                 segment_end += 1;
             }
 
-            let segment = &visible_text[position..segment_end];
+            let segment = &visible_text[segment_byte_start..segment_byte_end];
             let has_styling = current_color != Color::Reset || current_selected;
 
             if has_styling {
@@ -1421,6 +1453,7 @@ impl Editor {
             }
 
             position = segment_end;
+            segment_byte_start = segment_byte_end;
         }
 
         Ok(())
@@ -1550,7 +1583,11 @@ impl Editor {
             self.document.encoding_name(),
             language_name,
             self.caret_position.row_index + 1,
-            self.caret_position.column_index + 1
+            tab_handler::display_column(
+                self.document.line(self.caret_position.row_index),
+                self.caret_position.column_index,
+                self.tab_size
+            ) + 1
         );
 
         let left_side = format!("{file_name_with_status} | {}", self.help_message);
